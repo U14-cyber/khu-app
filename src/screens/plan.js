@@ -1,6 +1,14 @@
-import { h } from '../lib/dom.js';
+import { h, toast } from '../lib/dom.js';
 import { FLOORS, SCANNED, ROOMS, POINT_LABELS } from '../data/config.js';
 import { getWaypoints, goTour } from '../lib/state.js';
+import { attachPanZoom } from '../lib/panzoom.js';
+
+// 1층 평면도를 피난안내도 이미지로 보여줄지. false 로 바꾸면 기존(복도 선) 방식으로 즉시 돌아간다.
+const USE_EVAC_PLAN_1F = true;
+// 위에서부터 시도하고, 못 불러오면 다음 도면으로 넘어간다 (세로 도면 → 기존 가로 도면 → 기존 선 방식).
+const EVAC_PLAN_JSONS = ['/plans/f1-evac-portrait.json', '/plans/f1-evac.json'];
+const EVAC_TAP_MAX_M = 3; // 탭 위치에서 이 거리(m) 안에 이동 지점이 없으면 '스캔되지 않은 구역'
+
 
 const backBtn = () => h('a', { class: 'iconbtn', href: '#/', 'aria-label': '뒤로' }, h('svg', { viewBox: '0 0 24 24' }, h('path', { d: 'M15 5l-7 7 7 7' })));
 
@@ -49,4 +57,35 @@ export async function plan(floorId) {
   );
   root.append(h('p', { class: 'hint' }, '신고할 위치의 점을 누르면 3D 스캔으로 이동해요.'), h('div', { class: 'plan-wrap' }, svg));
   return root;
+}
+
+// 피난안내도 이미지 위에 이동 지점을 얹은 1층 평면도. 도면 px → (X,-Y) 미터 좌표는 JSON 의 imagePx_to_world 사용.
+async function evacPlan(metaUrl, wps, P, go, lab, name) {
+  const res = await fetch(metaUrl);
+  if (!res.ok) throw new Error(metaUrl);
+  const meta = await res.json();
+  const [A, B, tx, C, D, ty] = meta.transforms.imagePx_to_world, [iw, ih] = meta.image.size;
+  const m = [A, -C, B, -D, tx, -ty]; // SVG matrix(a b c d e f): x' = A x + B y + tx, y' = -(C x + D y + ty)
+  const deg = Math.atan2(m[1], m[0]) * 180 / Math.PI, rad = -deg * Math.PI / 180; // 도면을 원래 방향(복도 가로)으로 되돌리는 회전
+  const rot = ([x, y]) => [x * Math.cos(rad) - y * Math.sin(rad), x * Math.sin(rad) + y * Math.cos(rad)];
+  const corners = [[0, 0], [iw, 0], [iw, ih], [0, ih]].map(([x, y]) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+  const pts = [...corners, ...wps.map(P)].map(rot), pad = 0.6; // 여백은 점이 잘리지 않을 정도만
+  const x0 = Math.min(...pts.map(p => p[0])) - pad, y0 = Math.min(...pts.map(p => p[1])) - pad;
+  const full = { x: x0, y: y0, w: Math.max(...pts.map(p => p[0])) + pad - x0, h: Math.max(...pts.map(p => p[1])) + pad - y0 };
+
+  const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+  img.setAttribute('href', '/plans/' + meta.image.file); img.setAttribute('width', iw); img.setAttribute('height', ih);
+  img.setAttribute('transform', `matrix(${m.join(' ')})`);
+  const upright = (w, text) => { const [x, y] = P(w); return h('text', { class: 'tx s', transform: `translate(${x} ${y}) rotate(${deg}) translate(0 -1.6)` }, text); }; // 회전 보정: 글자는 똑바로
+  const world = h('g', {}, img, ...wps.map(w => h('circle', { class: 'pt', cx: P(w)[0], cy: P(w)[1], r: .3 })),
+    lab.first ? upright(wps[0], lab.first) : null, lab.last ? upright(wps.at(-1), lab.last) : null);
+  const g = h('g', { transform: `rotate(${-deg})` }, world);
+  const svg = h('svg', { class: 'plan evac', role: 'group', 'aria-label': `${name} 평면도` }, g);
+  attachPanZoom(svg, full, { onTap: (cx, cy) => {
+    const p = new DOMPoint(cx, cy).matrixTransform(g.getScreenCTM().inverse());
+    let best = null, bd = Infinity;
+    for (const w of wps) { const [x, y] = P(w), d = Math.hypot(x - p.x, y - p.y); if (d < bd) bd = d, best = w; }
+    if (best && bd <= EVAC_TAP_MAX_M) go('building', best); else toast('스캔되지 않은 구역입니다');
+  } });
+  return h('div', { class: 'plan-wrap evac' }, svg, h('div', { class: 'plan-hint' }, '도면을 눌러 3D로 이동 · 두 손가락으로 확대'));
 }
