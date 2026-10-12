@@ -3,6 +3,18 @@ import * as pc from 'playcanvas';
 import { h, toast } from '../lib/dom.js';
 import { FLOORS, SCENES } from '../data/config.js';
 import { getWaypoints, nav } from '../lib/state.js';
+import { levelFrom, toLevel, toScan, viewQuat } from '../lib/tilt.js';
+
+// 스캔 바닥이 수평에서 기운 것을 렌더링에서만 보정한다 (false 면 보정 없이 예전과 똑같이 동작).
+// 카메라 방향만 바꾼다: yaw/pitch 를 보정된 수평(바닥 법선이 위) 기준으로 재고, 카메라 위치(이동 지점 좌표)와 스플랫은 그대로 둔다.
+// 이동 지점 좌표, 신고 핀 저장 값(yaw/pitch 는 스캔 기준), 평면도 좌표 변환은 바뀌지 않는다. 층별 값은 바닥 평면 피팅 결과.
+const USE_TILT_FIX = true;
+const TILT_FIX = { // 층 -> { scene: 이 스캔에서만 적용, q: 보정 회전 [x,y,z,w] (스캔 좌표에서 바닥 법선을 +z 로), pivot: 측정에 쓴 바닥 중심 (참고용: 카메라만 보정해서 계산에는 쓰이지 않음) }
+  '1F': { scene: 'building', q: [-0.011042953, 0.001259767, 0, 0.999938231], pivot: [11.8, 2.7, -0.94] },   // 기울기 1.274°, 법선 (-0.00252, -0.02208, 0.99975)
+  '4F': { scene: 'building', q: [-0.007503845, -0.006803953, 0, 0.999948698], pivot: [14.6, -0.4, 11.42] }, // 평면 피팅 1.161°, 법선 (0.01361, -0.01501, 0.99979)
+  // 4F 대안(복도 구간 분해 1.372°): q: [-0.008178481, -0.008744639, 0, 0.999928319]
+  '5F': { scene: 'classroom513', q: [0.036475595, 0.005089618, 0, 0.999321583], pivot: [-5.3, 1.4, -1.568] }, // 513호(별도 교실 스캔): 기울기 4.221°, 법선 (-0.01017, 0.07290, 0.99729)
+};
 
 let eng; // 앱은 한 번만 만들어 재사용 (스캔 다시 불러오지 않도록)
 const loaded = {}; // scene -> Promise<Entity[]>
@@ -83,7 +95,13 @@ export async function openTour(host, opts, cb) {
   ui.forEach(n => host.append(n));
 
   // --- 시점 상태 ---
-  let yaw = opts.yaw ?? cur.heading, pitch = opts.pitch ?? 0, moving = null, arrows = [];
+  const fx = TILT_FIX[cur.floor];
+  const L = USE_TILT_FIX && fx && fx.scene === opts.scene ? levelFrom(fx) : null; // 이 층·이 스캔의 보정 (없으면 null). 층 이름이 같아도 다른 스캔의 값은 쓰지 않는다
+  const nUp = L ? L.n : [0, 0, 1];                                 // 스캔 기준에서 본 위쪽
+  let yaw, pitch; // 보정 기준 값. 저장·외부 값(opts, 핀)은 스캔 기준이라 바꿔서 쓴다
+  if (opts.yaw != null) ({ yaw, pitch } = toLevel(L, opts.yaw, opts.pitch ?? 0));
+  else { ({ yaw } = toLevel(L, cur.heading, 0)); pitch = L ? 0 : opts.pitch ?? 0; } // 보정 중이면 기본 시선은 수평
+  let moving = null, arrows = [];
   const tmp = new pc.Vec3(), tmp2 = new pc.Vec3();
   const setPos = p => cam.setLocalPosition(p[0], p[1], p[2]);
   setPos(cur.pos);
@@ -124,17 +142,18 @@ export async function openTour(host, opts, cb) {
     tmp.set(p[0], p[1], p[2]); world.getWorldTransform().transformPoint(tmp, tmp2);
     return cam.camera.worldToScreen(tmp2, out);
   };
-  const s = new pc.Vec3();
+  const s = new pc.Vec3(), camRot = new pc.Quat();
   const onUpdate = dt => {
     if (moving) {
       moving.t = Math.min(1, moving.t + dt / 0.55); const k = moving.t * moving.t * (3 - 2 * moving.t);
       setPos(moving.from.map((v, i) => v + (moving.to[i] - v) * k));
       if (moving.t >= 1) { cur = moving.next; moving = null; buildArrows(); refreshLabel(); arrowsEl.style.opacity = 1; }
     }
-    cam.setLocalEulerAngles(90 + pitch, 0, yaw);
+    if (L) { const q = viewQuat(L, yaw, pitch); camRot.set(q[0], q[1], q[2], q[3]); cam.setLocalRotation(camRot); }
+    else cam.setLocalEulerAngles(90 + pitch, 0, yaw);
     // 이동 화살표: 다음 지점 바닥 위치에 표시
     for (const a of arrows) {
-      toScreen([a.w.pos[0], a.w.pos[1], a.w.pos[2] - 1.35], s);
+      toScreen([a.w.pos[0] - 1.35 * nUp[0], a.w.pos[1] - 1.35 * nUp[1], a.w.pos[2] - 1.35 * nUp[2]], s);
       const ok = s.z > 0.3;
       a.btn.style.display = ok ? '' : 'none';
       if (ok) a.btn.style.transform = `translate(${s.x}px, ${s.y}px)`;
@@ -160,7 +179,8 @@ export async function openTour(host, opts, cb) {
       });
       app.renderNextFrame = true;
     });
-    cb.onPin({ pin: { scene: opts.scene, floor: cur.floor, waypoint: cur.id, yaw, pitch }, shot, label: labelFor(cur) });
+    const sv = toScan(L, yaw, pitch); // 저장은 스캔 기준 (보정을 끄고 열어도 같은 시선)
+    cb.onPin({ pin: { scene: opts.scene, floor: cur.floor, waypoint: cur.id, yaw: sv.yaw, pitch: sv.pitch }, shot, label: labelFor(cur) });
   });
 
   // --- 시작 ---
