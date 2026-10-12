@@ -1,0 +1,93 @@
+{
+ "id": "f1-portrait-v2",
+ "name": "1층 (세로) v2",
+ "generated": "2026-10-12T15:19:27.301Z",
+ "convention": "행렬 [a,b,tx,c,d,ty]: x' = a*x + b*y + tx, y' = c*x + d*y + ty. 이미지 px 는 좌상단 원점, 아래로 +y (연속 좌표). world = 3D 좌표 (X, Y) m. meshPx 는 plans/<층>.json 의 splat/메쉬 이미지 px.",
+ "source": {
+  "file": "plans-source/f1-evac-portrait.png",
+  "size": [
+   1086,
+   1366
+  ],
+  "crop": [
+   482,
+   226,
+   604,
+   1128
+  ],
+  "eraseExtra": [
+   [
+    734,
+    667,
+    754,
+    689
+   ]
+  ],
+  "eraseStats": {
+   "maskedPx": 33283,
+   "holesFilled": 134
+  }
+ },
+ "image": {
+  "file": "f1-evac-portrait.webp",
+  "size": [
+   604,
+   1128
+  ],
+  "bytes": 63232,
+  "alpha": false
+ },
+ "transforms": {
+  "imagePx_to_world": [
+   0.0421179815039426,
+   -0.012122893546572498,
+   7.106080454555162,
+   -0.012122893546572498,
+   -0.0421179815039426,
+   24.323715733605425
+  ],
+  "world_to_imagePx": [
+   21.926297350665152,
+   -6.311085174576235,
+   -2.300991287362357,
+   -6.311085174576235,
+   -21.926297350665152,
+   578.1761028541739
+  ],
+  "imagePx_to_oldImagePx": [
+   0,
+   1.132505083268051,
+   6.881454195712848,
+   -1.132505083268051,
+   0,
+   674.3236925277173
+  ],
+  "mPerPx": 0.04382794672247356,
+  "note": "v2: imagePx_to_world 를 메쉬 선→도면 벽 chamfer 로 다시 구한 변환(f1-evac.json 의 옛 변환 대신)으로 합성. imagePx_to_oldImagePx(세로→가로 도면 등록)는 그대로."
+ },
+ "alignment": {
+  "method": "메쉬 선→도면 벽 절단 chamfer 로 유사 변환(축척·회전·이동)을 새로 구함 (4층과 같은 방식), 세로→가로 도면 등록은 기존 그대로",
+  "chamferCost": {
+   "old": 12.19,
+   "v2": 9.197,
+   "note": "작을수록 메쉬 선이 도면 벽 위에 놓임 (절단 거리 평균, 메쉬 px, 절단 16px)"
+  },
+  "scaleMPerPxLandscape": {
+   "old": 0.04407,
+   "v2": 0.03869999999999997
+  },
+  "rotationDegLandscape": {
+   "old": 103.1971,
+   "v2": 106.058
+  },
+  "meshSimilarity": {
+   "s": 2.5799999999999983,
+   "thetaDeg": 106.0575,
+   "tx": 2499,
+   "ty": 187.65,
+   "note": "가로 도면(f1-evac.webp) px → f1-mesh.webp px"
+  },
+  "caveat": "1층 메쉬에는 도면에 없는 선이 많아 chamfer 최저점이 4층보다 덜 뚜렷함. 4층과의 계단실·E/L 정렬(쌓임) 조건만으로 구한 대안은 축척 0.0368 m/px, 도면 중심이 약 0.5~0.8 m 다른 위치.",
+  "replaces": "f1-evac-portrait.json 의 transforms.imagePx_to_world/world_to_imagePx (이 파일은 덮어쓰지 않음)"
+ }
+}
