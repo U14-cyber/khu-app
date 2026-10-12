@@ -8,9 +8,11 @@ STEP = 2.0          # 지점 간격 (m)
 LINK_R = 3.2        # 이 거리 안의 같은 층 지점은 서로 이동 가능
 SCENES = {
     # scene: (poses 파일, [(floor, idx 시작, idx 끝)])
-    'building': ('public/scans/building/poses.json', [('1F', 0, 2042), ('5F', 2992, 4672)]),
+    'building': ('public/scans/building/poses.json', [('1F', 0, 2042), ('4F', 2992, 4672)]),
     'classroom513': ('public/scans/classroom/poses.json', [('5F', 0, 1108)]),
 }
+# 층 라벨을 바로잡은 구간: (scene, 새 층) -> 옛 층. 옛 id 는 legacyId 로 남겨 저장된 신고가 계속 이어지게 한다.
+LEGACY_FLOOR = {('building', '4F'): '5F'}
 
 def quat_forward(w, x, y, z):  # 카메라 -Z 방향을 월드로
     v = (0, 0, -1)
@@ -28,8 +30,12 @@ for scene, (path, ranges) in SCENES.items():
             if last is None or math.dist(t, last) >= STEP:
                 f = quat_forward(*p['R'])
                 heading = math.degrees(math.atan2(-f[0], f[1]))
-                wps.append({'id': f'{scene}-{floor}-{len(wps):03d}', 'scene': scene, 'floor': floor,
-                            'pos': [round(t[0], 3), round(t[1], 3), round(t[2], 3)], 'heading': round(heading, 1)})
+                n = f'{len(wps):03d}'
+                wp = {'id': f'{scene}-{floor}-{n}', 'scene': scene, 'floor': floor,
+                      'pos': [round(t[0], 3), round(t[1], 3), round(t[2], 3)], 'heading': round(heading, 1)}
+                if (scene, floor) in LEGACY_FLOOR:
+                    wp['legacyId'] = f'{scene}-{LEGACY_FLOOR[(scene, floor)]}-{n}'
+                wps.append(wp)
                 last = t
     for w in wps:
         near = sorted((math.dist(w['pos'], o['pos']), o['id']) for o in wps

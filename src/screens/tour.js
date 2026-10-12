@@ -1,8 +1,8 @@
 // 3D 스캔 로드뷰: 지점에 서서 드래그로 둘러보고, 화살표로 다음 지점으로 이동. (자유 이동 없음)
 import * as pc from 'playcanvas';
-import { h } from '../lib/dom.js';
+import { h, toast } from '../lib/dom.js';
 import { FLOORS, SCENES } from '../data/config.js';
-import { getWaypoints } from '../lib/state.js';
+import { getWaypoints, nav } from '../lib/state.js';
 
 let eng; // 앱은 한 번만 만들어 재사용 (스캔 다시 불러오지 않도록)
 const loaded = {}; // scene -> Promise<Entity[]>
@@ -60,7 +60,12 @@ export async function openTour(host, opts, cb) {
   E.resize();
   const all = await getWaypoints();
   const wps = all[opts.scene], byId = Object.fromEntries(wps.map(w => [w.id, w]));
-  let cur = byId[opts.waypointId] || wps[0];
+  const byLegacy = Object.fromEntries(wps.filter(w => w.legacyId).map(w => [w.legacyId, w])); // 층 라벨을 바로잡기 전 id 로 저장된 신고
+  let cur = opts.waypointId ? byId[opts.waypointId] || byLegacy[opts.waypointId] : wps[0];
+  if (!cur) { // 없는 지점이면 엉뚱한 곳(첫 지점)으로 보내지 않고 알린 뒤 닫는다
+    console.warn('[tour] 이동 지점을 찾을 수 없습니다:', opts.scene, opts.waypointId);
+    toast('위치를 찾을 수 없어요'); host.hidden = true; nav.tour = null; cb.onClose(); return () => {};
+  }
   const floorName = FLOORS.find(f => f.id === cur.floor)?.name || '';
   const labelFor = w => opts.scene === 'classroom513' ? `${floorName} · 513호` : `${floorName} · 지점 ${wps.filter(x => x.floor === w.floor).indexOf(w) + 1}`;
 
