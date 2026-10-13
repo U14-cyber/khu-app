@@ -57,6 +57,13 @@ h1, h2, h3 { margin: 0; }
 .plan .floorfill { stroke: #f6f2e8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .plan .pt { fill: var(--accent); stroke: #fff; stroke-width: .25; }
 .plan .hit { fill: transparent; cursor: pointer; }
+.plan-full { height: 100%; display: flex; flex-direction: column; }
+.plan-wrap.evac { position: relative; flex: 1; min-height: 0; margin: 0 6px 6px; padding: 0; overflow: hidden; }
+.plan.evac { width: 100%; height: 100%; max-height: none; touch-action: none; cursor: grab; user-select: none; }
+.plan.evac .pt { stroke-width: .08; pointer-events: none; }
+.plan.evac .tx { font-size: 1.2px; paint-order: stroke; stroke: #fff; stroke-width: .35px; }
+.plan-hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 6px 12px; border-radius: 999px; background: #1d1f27cc; color: #fff; font-size: 12px; white-space: nowrap; pointer-events: none; animation: plan-hint 4.5s forwards; }
+@keyframes plan-hint { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 .plan .hit:hover + .pt, .plan .hit:active + .pt { fill: #d1507a; }
 .plan .room { fill: #f3e3d4; stroke: #2b2f3a; stroke-width: .28; cursor: pointer; }
 .plan .tx { font: 700 1.5px -apple-system, sans-serif; fill: #2b2f3a; text-anchor: middle; pointer-events: none; }

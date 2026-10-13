@@ -7,7 +7,7 @@ export const FLOORS = [
   { id: '1F', name: '1층' },
   { id: 'B1', name: '지하 1층' },
 ];
-export const SCANNED = { '1F': 'building', '5F': 'building' };
+export const SCANNED = { '1F': 'building', '4F': 'building', '5F': 'classroom513' };
 
 // 스캔 파일 (public/scans 아래)
 export const SCENES = {
@@ -15,13 +15,13 @@ export const SCENES = {
   classroom513: { files: ['/scans/classroom/lod0_a.sog', '/scans/classroom/lod0_b.sog'], label: '513호' },
 };
 
-// 평면도에 올리는 호실. building 5F 복도 지점 번호(anchor) 옆에 붙인다. 위치는 여기서 수정.
+// 복도 스캔 없이 호실 스캔만 있는 층의 호실. 평면도에는 호실 사각형만 보여 주고, 누르면 해당 스캔(waypoint)으로 들어간다.
 export const ROOMS = {
-  '5F': [{ id: '513', name: '513호', scene: 'classroom513', anchor: 0.5, side: 1, w: 9, d: 7 }],
+  '5F': [{ id: '513', name: '513호', scene: 'classroom513', waypoint: 'classroom513-5F-000' }],
 };
 // 스캔 지점에 붙이는 이름표 (층 안에서 첫/마지막 지점 등)
 export const POINT_LABELS = {
   '1F': { first: '현관', last: '계단' },
-  '5F': { first: '계단', last: '복도 끝' },
+  '4F': { first: '계단', last: '복도 끝' },
 };
 export const STATUSES = ['미확인', '확인', '진행 중', '완료'];
