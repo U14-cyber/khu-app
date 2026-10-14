@@ -6,8 +6,16 @@ export function home() {
   const X = 48, W = 264, FH = 62, TOP = 62, GROUND = TOP + FH * 5;
   const floors = FLOORS.map((f, i) => {
     const y = TOP + FH * i, b1 = f.id === 'B1', scanned = !!SCANNED[f.id];
-    const wins = [0, 1, 2, 3, 4].map(k => h('rect', { class: 'win', x: X + 74 + k * 36, y: y + 16, width: 24, height: 22, rx: 2 }));
-    const door = f.id === '1F' ? h('rect', { x: X + W / 2 + 22, y: y + 16, width: 22, height: FH - 16, fill: '#8a1f3d', stroke: '#2b2f3a', 'stroke-width': 2 }) : null;
+    const isMain = f.id === '1F'; // 1층은 가운데(오른쪽에서 세 번째) 창을 빼고 그 자리에 출입문을 둔다
+    const wins = [0, 1, 2, 3, 4].filter(k => !(isMain && k === 2)).map(k => h('rect', { class: 'win', x: X + 74 + k * 36, y: y + 16, width: 24, height: 22, rx: 2 }));
+    const dx = X + 144, dw = 28, dy = y + 20;
+    const door = isMain ? h('g', {},
+      h('rect', { x: dx - 6, y: y + 12, width: dw + 12, height: 6, rx: 2, fill: '#2b2f3a' }),            // 문 위 차양
+      h('rect', { x: dx, y: dy, width: dw, height: FH - 20, fill: '#8a1f3d', stroke: '#2b2f3a', 'stroke-width': 2 }),
+      h('rect', { class: 'win', x: dx + 4, y: dy + 5, width: dw - 8, height: 22, rx: 2 }),               // 문 유리
+      h('line', { x1: dx + dw / 2, x2: dx + dw / 2, y1: dy, y2: y + FH, stroke: '#2b2f3a', 'stroke-width': 1.5 }), // 양쪽 문 경계
+      h('circle', { cx: dx + dw / 2 - 3, cy: dy + 34, r: 1.4, fill: '#f3e3d4' }), h('circle', { cx: dx + dw / 2 + 3, cy: dy + 34, r: 1.4, fill: '#f3e3d4' }),
+    ) : null;
     return h('g', { class: `floor ${scanned ? 'scanned' : ''} ${b1 ? 'b1' : ''}`, role: 'button', tabindex: 0, 'aria-label': `${f.name} 평면도 보기`,
       onClick: () => (location.hash = `#/floor/${f.id}`), onKeydown: e => e.key === 'Enter' && (location.hash = `#/floor/${f.id}`) },
       h('rect', { class: 'slab', x: X, y, width: W, height: FH }),
